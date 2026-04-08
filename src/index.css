@@ -193,4 +193,13 @@ img.loaded { opacity: 1; }
 
 .toggle-checkbox:checked::before {
   transform: translateX(20px);
+  /* Chatbot animations */
+@keyframes bounce {
+  0%, 60%, 100% { transform: translateY(0); }
+  30% { transform: translateY(-4px); }
+}
+
+.animate-bounce {
+  animation: bounce 1s infinite;
+}
 }

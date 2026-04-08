@@ -43,6 +43,9 @@ import AdminNewsletter from './pages/admin/AdminNewsletter';
 import AdminRevenue from './pages/admin/AdminRevenue';
 import AdminSEO from './pages/admin/AdminSEO';
 
+// Chatbot Component
+import Chatbot from './components/common/Chatbot';
+
 const Spinner = () => (
   <div className="min-h-screen flex items-center justify-center bg-slate-50">
     <div className="flex flex-col items-center gap-4">
@@ -88,13 +91,12 @@ const App = () => (
         <Route path="/reset-password" element={<ResetPasswordPage />} />
 
         {/* Protected User Routes */}
-       {/* Protected User Routes */}
-<Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
-<Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
-<Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
-<Route path="/add-listing" element={<ProtectedRoute><AddListingPage /></ProtectedRoute>} />
-<Route path="/add-listing/:id" element={<ProtectedRoute><AddListingPage /></ProtectedRoute>} />
-<Route path="/edit-listing/:id" element={<ProtectedRoute><AddListingPage /></ProtectedRoute>} />  {/* ADD THIS */}
+        <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
+        <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
+        <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+        <Route path="/add-listing" element={<ProtectedRoute><AddListingPage /></ProtectedRoute>} />
+        <Route path="/add-listing/:id" element={<ProtectedRoute><AddListingPage /></ProtectedRoute>} />
+        <Route path="/edit-listing/:id" element={<ProtectedRoute><AddListingPage /></ProtectedRoute>} />
 
         {/* Vendor Routes */}
         <Route path="/vendor/dashboard" element={<ProtectedRoute requireVendor><VendorDashboard /></ProtectedRoute>} />
@@ -121,6 +123,8 @@ const App = () => (
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </BrowserRouter>
+    
+    {/* Toaster for notifications */}
     <Toaster
       position="top-right"
       toastOptions={{
@@ -134,9 +138,14 @@ const App = () => (
         success: { iconTheme: { primary: '#0f2a56', secondary: '#fff' } },
       }}
     />
+    
+    {/* Chatbot - Appears on all pages */}
+    <Chatbot />
   </AuthProvider>
 );
 
 ReactDOM.createRoot(document.getElementById('root')).render(
-  <React.StrictMode><App /></React.StrictMode>
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
 );
