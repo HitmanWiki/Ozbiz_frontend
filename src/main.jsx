@@ -42,6 +42,8 @@ import AdminBlogs from './pages/admin/AdminBlogs';
 import AdminNewsletter from './pages/admin/AdminNewsletter';
 import AdminRevenue from './pages/admin/AdminRevenue';
 import AdminSEO from './pages/admin/AdminSEO';
+import AdminEmailTemplates from './pages/admin/AdminEmailTemplates';
+
 
 // Chatbot Component
 import Chatbot from './components/common/Chatbot';
@@ -117,6 +119,7 @@ const App = () => (
           <Route path="newsletter" element={<AdminNewsletter />} />
           <Route path="revenue" element={<AdminRevenue />} />
           <Route path="seo" element={<AdminSEO />} />
+          <Route path="email-templates" element={<AdminEmailTemplates />} />
         </Route>
 
         {/* 404 Not Found */}

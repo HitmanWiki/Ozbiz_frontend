@@ -3,10 +3,10 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   DollarSign, TrendingUp, Users, CreditCard, Download, 
-  Calendar, ArrowUp, ArrowDown, PieChart, BarChart3 
+  Calendar, ArrowUp, ArrowDown, PieChart, BarChart3, FileText, FileSpreadsheet
 } from 'lucide-react';
 import {
-  LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer, PieChart as RePieChart, 
   Pie, Cell, Area, AreaChart
 } from 'recharts';
@@ -21,7 +21,7 @@ export default function AdminRevenue() {
   const [planDistribution, setPlanDistribution] = useState([]);
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState('year');
-  const [selectedPlan, setSelectedPlan] = useState('all');
+  const [showExportMenu, setShowExportMenu] = useState(false);
 
   useEffect(() => {
     fetchRevenueStats();
@@ -33,7 +33,6 @@ export default function AdminRevenue() {
       const res = await api.get('/admin/subscription/stats');
       setStats(res.data);
       
-      // Prepare plan distribution for pie chart
       const plans = [
         { name: 'Free', value: res.data.plans?.free || 0, color: '#94A3B8' },
         { name: 'Basic', value: res.data.plans?.basic || 0, color: '#3B82F6' },
@@ -49,13 +48,11 @@ export default function AdminRevenue() {
 
   const fetchMonthlyRevenue = async () => {
     try {
-      // Get monthly revenue from subscription history
       const res = await api.get('/admin/subscription/monthly', { 
         params: { range: dateRange } 
       });
       setMonthlyData(res.data || generateMockData());
     } catch (err) {
-      console.error('Error fetching monthly revenue:', err);
       setMonthlyData(generateMockData());
     } finally {
       setLoading(false);
@@ -72,18 +69,61 @@ export default function AdminRevenue() {
     }));
   };
 
-  const handleExportCSV = () => {
-    const headers = ['Month', 'Revenue', 'Subscribers', 'Growth %'];
-    const csvData = monthlyData.map(d => [d.month, d.revenue, d.subscribers, d.growth.toFixed(2)]);
-    const csv = [headers, ...csvData].map(row => row.join(',')).join('\n');
+  // Export to CSV
+  const exportToCSV = (data, filename, headers) => {
+    const csvData = data.map(row => headers.map(h => row[h]).join(','));
+    const csv = [headers.join(','), ...csvData].join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `revenue-report-${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `${filename}-${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-    toast.success('Report downloaded');
+    toast.success(`${filename} exported successfully`);
+  };
+
+  // Export to PDF (using browser print)
+  const exportToPDF = (elementId, title) => {
+    const printContent = document.getElementById(elementId);
+    const originalTitle = document.title;
+    document.title = title;
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>${title}</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; }
+            table { width: 100%; border-collapse: collapse; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background-color: #f2f2f2; }
+            h1 { color: #0a1d3d; }
+          </style>
+        </head>
+        <body>
+          <h1>${title}</h1>
+          ${printContent ? printContent.innerHTML : ''}
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.print();
+    printWindow.close();
+    document.title = originalTitle;
+    toast.success(`${title} exported to PDF`);
+  };
+
+  const exportRevenueReport = () => {
+    exportToCSV(monthlyData, 'revenue-report', ['month', 'revenue', 'subscribers', 'growth']);
+  };
+
+  const exportTransactions = () => {
+    if (stats.recentTransactions?.length) {
+      exportToCSV(stats.recentTransactions, 'transactions', ['user.name', 'plan', 'amount', 'createdAt', 'status']);
+    } else {
+      toast.error('No transactions to export');
+    }
   };
 
   const calculateTotalSubscribers = () => {
@@ -124,9 +164,42 @@ export default function AdminRevenue() {
             <option value="year">Last 12 Months</option>
             <option value="all">All Time</option>
           </select>
-          <button onClick={handleExportCSV} className="btn-outline text-sm flex items-center gap-2">
-            <Download size={14} /> Export Report
-          </button>
+          
+          {/* Export Dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setShowExportMenu(!showExportMenu)}
+              className="btn-primary text-sm flex items-center gap-2"
+            >
+              <Download size={14} /> Export
+            </button>
+            {showExportMenu && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowExportMenu(false)} />
+                <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-slate-100 py-1 z-50">
+                  <button
+                    onClick={() => { exportRevenueReport(); setShowExportMenu(false); }}
+                    className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                  >
+                    <FileSpreadsheet size={14} /> Revenue Report (CSV)
+                  </button>
+                  <button
+                    onClick={() => { exportTransactions(); setShowExportMenu(false); }}
+                    className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                  >
+                    <FileText size={14} /> Transactions (CSV)
+                  </button>
+                  <div className="border-t border-slate-100 my-1" />
+                  <button
+                    onClick={() => { exportToPDF('revenue-charts', 'Revenue Report'); setShowExportMenu(false); }}
+                    className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+                  >
+                    <FileText size={14} /> Export as PDF
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
@@ -188,17 +261,13 @@ export default function AdminRevenue() {
         </div>
       </div>
 
-      {/* Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Revenue Trend Chart */}
+      {/* Charts Row - with id for PDF export */}
+      <div id="revenue-charts" className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white rounded-xl border border-slate-100 p-5 shadow-sm">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-semibold text-navy-900 flex items-center gap-2">
               <BarChart3 size={16} /> Revenue Trend
             </h3>
-            <div className="flex gap-2">
-              <span className="text-xs px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full">Revenue</span>
-            </div>
           </div>
           <ResponsiveContainer width="100%" height={300}>
             <AreaChart data={monthlyData}>
@@ -211,7 +280,6 @@ export default function AdminRevenue() {
           </ResponsiveContainer>
         </div>
 
-        {/* Subscriber Growth Chart */}
         <div className="bg-white rounded-xl border border-slate-100 p-5 shadow-sm">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-semibold text-navy-900 flex items-center gap-2">
