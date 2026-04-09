@@ -3,9 +3,9 @@ import { useState, useEffect } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, Building2, Users, Star, MessageSquare, 
-  Tag, Megaphone, Newspaper, Mail, Settings,
+  Tag, Megaphone, Newspaper, Mail, TrendingUp, Settings,
   Shield, LogOut, ChevronDown, Eye, CreditCard, SearchCode,
-  User, Briefcase, Bell, Menu
+  User, Briefcase, Bell, Menu, Globe
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
@@ -21,7 +21,8 @@ const navItems = [
   { path: '/admin/blogs', label: 'Blog Posts', icon: Newspaper },
   { path: '/admin/newsletter', label: 'Newsletter', icon: Mail },
   { path: '/admin/revenue', label: 'Revenue', icon: CreditCard },
-  { path: '/admin/seo', label: 'Site', icon: Settings },  // Changed from SEO to Site
+  { path: '/admin/site', label: 'Site', icon: Settings },      // Site Settings
+  { path: '/admin/seo', label: 'SEO', icon: SearchCode },      // SEO Tab - NEW
 ];
 
 export default function AdminLayout() {
