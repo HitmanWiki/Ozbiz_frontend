@@ -5,7 +5,8 @@ import {
   LayoutDashboard, Building2, Users, Star, MessageSquare, 
   Tag, Megaphone, Newspaper, Mail, TrendingUp, Settings,
   Shield, LogOut, ChevronDown, Eye, CreditCard, SearchCode,
-  User, Briefcase, Bell, Menu, FileText, Send
+  User, Briefcase, Bell, Menu, FileText, Send, Download,
+  Globe, Code, FileSpreadsheet
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
@@ -21,6 +22,7 @@ const navItems = [
   { path: '/admin/blogs', label: 'Blog Posts', icon: Newspaper },
   { path: '/admin/newsletter', label: 'Newsletter', icon: Mail },
   { path: '/admin/email-templates', label: 'Email Templates', icon: FileText },
+  { path: '/admin/exports', label: 'Exports', icon: Download },
   { path: '/admin/revenue', label: 'Revenue', icon: CreditCard },
   { path: '/admin/site', label: 'Site', icon: Settings },
   { path: '/admin/seo', label: 'SEO', icon: SearchCode },

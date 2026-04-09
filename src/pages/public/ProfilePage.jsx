@@ -4,7 +4,8 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   Heart, Clock, Mail, Bell, User, ShoppingBag, Star, 
   Trash2, ChevronRight, MapPin, Phone, MessageCircle,
-  Settings, History, Bookmark, LogOut, CheckCircle, XCircle
+  Settings, History, Bookmark, LogOut, CheckCircle, XCircle,
+  Shield, QrCode, Copy, Download, FileText, Users
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Navbar from '../../components/common/Navbar';
@@ -24,7 +25,7 @@ const TabButton = ({ active, onClick, icon: Icon, label, count }) => (
     {label}
     {count !== undefined && count > 0 && (
       <span className={`ml-1 text-xs px-1.5 py-0.5 rounded-full ${
-        active ? 'bg-gold-400 text-navy-900' : 'bg-slate-200 text-slate-600'
+        active ? 'bg-amber-400 text-navy-900' : 'bg-slate-200 text-slate-600'
       }`}>
         {count}
       </span>
@@ -44,7 +45,7 @@ const FavoriteCard = ({ listing, onRemove }) => (
       )}
     </div>
     <div className="flex-1 min-w-0">
-      <Link to={`/listings/${listing.slug}`} className="font-semibold text-navy-900 hover:text-gold-600 transition-colors">
+      <Link to={`/listings/${listing.slug}`} className="font-semibold text-navy-900 hover:text-amber-600 transition-colors">
         {listing.title}
       </Link>
       {listing.city && (
@@ -59,7 +60,7 @@ const FavoriteCard = ({ listing, onRemove }) => (
         >
           <Trash2 size={12} /> Remove
         </button>
-        <Link to={`/listings/${listing.slug}`} className="text-xs text-gold-600 hover:text-gold-700">
+        <Link to={`/listings/${listing.slug}`} className="text-xs text-amber-600 hover:text-amber-700">
           View Details →
         </Link>
       </div>
@@ -71,7 +72,7 @@ const EnquiryCard = ({ enquiry }) => (
   <div className="p-4 bg-white rounded-xl border border-slate-100">
     <div className="flex items-start justify-between">
       <div>
-        <Link to={`/listings/${enquiry.listing?.slug}`} className="font-semibold text-navy-900 hover:text-gold-600">
+        <Link to={`/listings/${enquiry.listing?.slug}`} className="font-semibold text-navy-900 hover:text-amber-600">
           {enquiry.listing?.title}
         </Link>
         <p className="text-xs text-slate-500 mt-0.5">
@@ -123,7 +124,7 @@ const SearchHistoryItem = ({ search, onClear, onRerun }) => (
     <div className="flex gap-2">
       <button 
         onClick={() => onRerun(search)}
-        className="text-xs text-gold-600 hover:text-gold-700 px-2 py-1 rounded hover:bg-gold-50"
+        className="text-xs text-amber-600 hover:text-amber-700 px-2 py-1 rounded hover:bg-amber-50"
       >
         Search Again
       </button>
@@ -138,7 +139,7 @@ const SearchHistoryItem = ({ search, onClear, onRerun }) => (
 );
 
 const NotificationCard = ({ notification, onMarkRead }) => (
-  <div className={`p-3 rounded-lg border ${notification.isRead ? 'bg-white border-slate-100' : 'bg-gold-50 border-gold-200'}`}>
+  <div className={`p-3 rounded-lg border ${notification.isRead ? 'bg-white border-slate-100' : 'bg-amber-50 border-amber-200'}`}>
     <div className="flex items-start justify-between">
       <div className="flex-1">
         <p className="text-sm font-medium text-navy-900">{notification.title}</p>
@@ -148,7 +149,7 @@ const NotificationCard = ({ notification, onMarkRead }) => (
       {!notification.isRead && (
         <button 
           onClick={() => onMarkRead(notification.id)}
-          className="text-xs text-gold-600 hover:text-gold-700"
+          className="text-xs text-amber-600 hover:text-amber-700"
         >
           Mark read
         </button>
@@ -168,6 +169,18 @@ export default function ProfilePage() {
   const [enquiries, setEnquiries] = useState([]);
   const [searchHistory, setSearchHistory] = useState([]);
   const [notifications, setNotifications] = useState([]);
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [unreadCount, setUnreadCount] = useState(0);
+  
+  // 2FA States
+  const [show2FAModal, setShow2FAModal] = useState(false);
+  const [step, setStep] = useState('setup');
+  const [qrCode, setQrCode] = useState('');
+  const [secret, setSecret] = useState('');
+  const [twoFAToken, setTwoFAToken] = useState('');
+  
+  // Notification Settings
   const [notificationSettings, setNotificationSettings] = useState({
     emailEnquiries: true,
     emailReviews: true,
@@ -176,12 +189,8 @@ export default function ProfilePage() {
     pushEnquiries: true,
     pushReviews: true
   });
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
-    // Set active tab from URL param
     if (tabParam && ['favorites', 'enquiries', 'search', 'notifications', 'settings'].includes(tabParam)) {
       setActiveTab(tabParam);
     }
@@ -218,6 +227,51 @@ export default function ProfilePage() {
     }
   };
 
+  // 2FA Handlers
+  const handleSetup2FA = async () => {
+    try {
+      const res = await api.post('/auth/enable-2fa');
+      setQrCode(res.data.qrCode);
+      setSecret(res.data.secret);
+      setStep('setup');
+      setShow2FAModal(true);
+    } catch (err) {
+      toast.error('Failed to setup 2FA');
+    }
+  };
+
+  const handleVerify2FA = async () => {
+    if (!twoFAToken || twoFAToken.length !== 6) {
+      toast.error('Please enter a valid 6-digit code');
+      return;
+    }
+    try {
+      await api.post('/auth/verify-2fa', { token: twoFAToken });
+      setStep('verify');
+      toast.success('2FA enabled successfully!');
+      fetchAllData();
+    } catch (err) {
+      toast.error('Invalid code. Please try again.');
+    }
+  };
+
+  const handleDisable2FA = async () => {
+    const token = prompt('Enter your 2FA code to disable:');
+    if (!token) return;
+    try {
+      await api.post('/auth/disable-2fa', { token });
+      toast.success('2FA disabled');
+      fetchAllData();
+    } catch (err) {
+      toast.error('Invalid code');
+    }
+  };
+
+  const copySecret = () => {
+    navigator.clipboard.writeText(secret);
+    toast.success('Secret copied to clipboard');
+  };
+
   const handleRemoveFavorite = async (listingId) => {
     try {
       await api.delete(`/user/favorites/${listingId}`);
@@ -231,7 +285,6 @@ export default function ProfilePage() {
   const handleClearSearchHistory = async (searchId = null) => {
     try {
       if (searchId) {
-        // Delete single item
         await api.delete(`/user/search-history/${searchId}`);
         setSearchHistory(searchHistory.filter(s => s.id !== searchId));
         toast.success('Search removed');
@@ -311,7 +364,7 @@ export default function ProfilePage() {
       <Navbar />
 
       {/* Header */}
-      <div className="bg-navy-900 py-8">
+      <div className="bg-gradient-to-r from-navy-900 to-navy-800 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <h1 className="font-display text-2xl font-bold text-white">My Account</h1>
           <p className="text-white/60 text-sm mt-1">Manage your favorites, enquiries, and settings</p>
@@ -322,9 +375,9 @@ export default function ProfilePage() {
         <div className="flex flex-col lg:flex-row gap-8">
           {/* Sidebar */}
           <div className="lg:w-64 shrink-0">
-            <div className="bg-white rounded-xl border border-slate-100 p-4 sticky top-20">
+            <div className="bg-white rounded-xl border border-slate-100 p-4 sticky top-20 shadow-sm">
               <div className="flex items-center gap-3 pb-4 mb-4 border-b border-slate-100">
-                <div className="w-10 h-10 rounded-full bg-navy-100 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-navy-100 to-navy-200 flex items-center justify-center">
                   <User size={20} className="text-navy-600" />
                 </div>
                 <div>
@@ -359,7 +412,7 @@ export default function ProfilePage() {
           <div className="flex-1">
             {/* Favorites Tab */}
             {activeTab === 'favorites' && (
-              <div className="bg-white rounded-xl border border-slate-100 p-6">
+              <div className="bg-white rounded-xl border border-slate-100 p-6 shadow-sm">
                 <h2 className="font-display text-xl font-semibold text-navy-900 mb-4 flex items-center gap-2">
                   <Heart size={20} className="text-red-500" /> Saved Businesses
                 </h2>
@@ -387,7 +440,7 @@ export default function ProfilePage() {
 
             {/* Enquiries Tab */}
             {activeTab === 'enquiries' && (
-              <div className="bg-white rounded-xl border border-slate-100 p-6">
+              <div className="bg-white rounded-xl border border-slate-100 p-6 shadow-sm">
                 <h2 className="font-display text-xl font-semibold text-navy-900 mb-4 flex items-center gap-2">
                   <MessageCircle size={20} /> My Enquiries
                 </h2>
@@ -408,7 +461,7 @@ export default function ProfilePage() {
 
             {/* Search History Tab */}
             {activeTab === 'search' && (
-              <div className="bg-white rounded-xl border border-slate-100 p-6">
+              <div className="bg-white rounded-xl border border-slate-100 p-6 shadow-sm">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="font-display text-xl font-semibold text-navy-900 flex items-center gap-2">
                     <History size={20} /> Search History
@@ -447,12 +500,12 @@ export default function ProfilePage() {
 
             {/* Notifications Tab */}
             {activeTab === 'notifications' && (
-              <div className="bg-white rounded-xl border border-slate-100 p-6">
+              <div className="bg-white rounded-xl border border-slate-100 p-6 shadow-sm">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="font-display text-xl font-semibold text-navy-900 flex items-center gap-2">
                     <Bell size={20} /> Notifications
                     {unreadCount > 0 && (
-                      <span className="text-xs bg-gold-100 text-gold-700 px-2 py-0.5 rounded-full">
+                      <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">
                         {unreadCount} unread
                       </span>
                     )}
@@ -460,7 +513,7 @@ export default function ProfilePage() {
                   {unreadCount > 0 && (
                     <button 
                       onClick={handleMarkAllRead}
-                      className="text-xs text-gold-600 hover:text-gold-700"
+                      className="text-xs text-amber-600 hover:text-amber-700"
                     >
                       Mark all as read
                     </button>
@@ -490,11 +543,12 @@ export default function ProfilePage() {
 
             {/* Settings Tab */}
             {activeTab === 'settings' && (
-              <div className="bg-white rounded-xl border border-slate-100 p-6">
+              <div className="bg-white rounded-xl border border-slate-100 p-6 shadow-sm">
                 <h2 className="font-display text-xl font-semibold text-navy-900 mb-4 flex items-center gap-2">
                   <Settings size={20} /> Notification Preferences
                 </h2>
                 <div className="space-y-6">
+                  {/* Email Notifications */}
                   <div>
                     <h3 className="font-semibold text-navy-800 mb-3">Email Notifications</h3>
                     <div className="space-y-3">
@@ -536,6 +590,8 @@ export default function ProfilePage() {
                       </label>
                     </div>
                   </div>
+
+                  {/* Push Notifications */}
                   <div className="border-t border-slate-100 pt-4">
                     <h3 className="font-semibold text-navy-800 mb-3">Push Notifications</h3>
                     <div className="space-y-3">
@@ -565,12 +621,132 @@ export default function ProfilePage() {
                       </label>
                     </div>
                   </div>
+
+                  {/* Two-Factor Authentication */}
+                  <div className="border-t border-slate-100 pt-4">
+                    <h3 className="font-semibold text-navy-800 mb-3 flex items-center gap-2">
+                      <Shield size={16} /> Two-Factor Authentication (2FA)
+                    </h3>
+                    {user?.twoFactorEnabled ? (
+                      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-medium text-green-800">✅ 2FA is enabled</p>
+                            <p className="text-xs text-green-600 mt-1">Your account is protected with two-factor authentication</p>
+                          </div>
+                          <button
+                            onClick={handleDisable2FA}
+                            className="text-sm text-red-600 hover:text-red-700 px-3 py-1.5 border border-red-300 rounded-lg hover:bg-red-50"
+                          >
+                            Disable 2FA
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
+                        <p className="text-sm text-slate-600 mb-3">Add an extra layer of security to your account</p>
+                        <button
+                          onClick={handleSetup2FA}
+                          className="btn-primary text-sm px-4 py-2"
+                        >
+                          Set up Two-Factor Authentication
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Account Information */}
+                  <div className="border-t border-slate-100 pt-4">
+                    <h3 className="font-semibold text-navy-800 mb-3">Account Information</h3>
+                    <div className="space-y-2">
+                      <div className="flex justify-between py-2">
+                        <span className="text-sm text-slate-500">Member since</span>
+                        <span className="text-sm text-navy-900">{new Date(user?.createdAt).toLocaleDateString()}</span>
+                      </div>
+                      <div className="flex justify-between py-2">
+                        <span className="text-sm text-slate-500">Account type</span>
+                        <span className="text-sm font-medium text-navy-900 capitalize">{user?.userType}</span>
+                      </div>
+                      <div className="flex justify-between py-2">
+                        <span className="text-sm text-slate-500">Email status</span>
+                        <span className={`text-sm font-medium ${user?.emailVerified ? 'text-green-600' : 'text-amber-600'}`}>
+                          {user?.emailVerified ? 'Verified' : 'Unverified'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
           </div>
         </div>
       </div>
+
+      {/* 2FA Modal */}
+      {show2FAModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-display text-xl font-semibold text-navy-900">Setup Two-Factor Authentication</h3>
+              <button onClick={() => setShow2FAModal(false)} className="text-slate-400 hover:text-slate-600">
+                ✕
+              </button>
+            </div>
+            
+            {step === 'setup' ? (
+              <>
+                <div className="mb-4 p-3 bg-blue-50 rounded-lg">
+                  <p className="text-sm text-blue-800">1. Scan this QR code with Google Authenticator or Authy</p>
+                </div>
+                {qrCode && (
+                  <div className="flex justify-center mb-4">
+                    <img src={qrCode} alt="2FA QR Code" className="w-48 h-48 border rounded-lg" />
+                  </div>
+                )}
+                <p className="text-xs text-slate-500 text-center mb-4">
+                  Or enter this code manually: <code className="bg-slate-100 px-1 rounded font-mono">{secret}</code>
+                  <button onClick={copySecret} className="ml-2 text-amber-600 hover:text-amber-700">
+                    <Copy size={12} />
+                  </button>
+                </p>
+                
+                <div className="mb-4">
+                  <label className="block text-xs font-semibold text-slate-600 mb-1.5">Enter 6-digit code from app</label>
+                  <input
+                    type="text"
+                    maxLength="6"
+                    placeholder="000000"
+                    value={twoFAToken}
+                    onChange={(e) => setTwoFAToken(e.target.value)}
+                    className="input text-center text-2xl tracking-widest"
+                  />
+                </div>
+                
+                <button
+                  onClick={handleVerify2FA}
+                  disabled={!twoFAToken || twoFAToken.length !== 6}
+                  className="btn-primary w-full py-2 disabled:opacity-50"
+                >
+                  Verify and Enable
+                </button>
+              </>
+            ) : step === 'verify' ? (
+              <>
+                <div className="text-center py-4">
+                  <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <CheckCircle size={32} className="text-green-600" />
+                  </div>
+                  <p className="text-navy-900 font-semibold mb-1">2FA Enabled Successfully!</p>
+                  <p className="text-sm text-slate-500">Your account is now more secure.</p>
+                  <button onClick={() => { setShow2FAModal(false); fetchAllData(); }} className="btn-primary mt-4">
+                    Done
+                  </button>
+                </div>
+              </>
+            ) : null}
+          </div>
+        </div>
+      )}
 
       <Footer />
     </div>
