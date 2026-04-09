@@ -1,10 +1,10 @@
 // frontend/src/pages/public/ProfilePage.jsx
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { 
   Heart, Clock, Mail, Bell, User, ShoppingBag, Star, 
   Trash2, ChevronRight, MapPin, Phone, MessageCircle,
-  Settings, History, Bookmark, LogOut
+  Settings, History, Bookmark, LogOut, CheckCircle, XCircle
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Navbar from '../../components/common/Navbar';
@@ -14,7 +14,7 @@ import api from '../../utils/api';
 const TabButton = ({ active, onClick, icon: Icon, label, count }) => (
   <button
     onClick={onClick}
-    className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
+    className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all w-full ${
       active 
         ? 'bg-navy-800 text-white shadow-md' 
         : 'text-slate-600 hover:bg-slate-100'
@@ -99,26 +99,75 @@ const EnquiryCard = ({ enquiry }) => (
   </div>
 );
 
-const SearchHistoryItem = ({ search, onClear }) => (
+const SearchHistoryItem = ({ search, onClear, onRerun }) => (
   <div className="flex items-center justify-between p-3 bg-white rounded-lg border border-slate-100">
-    <div className="flex items-center gap-3">
+    <div className="flex items-center gap-3 flex-1">
       <History size={16} className="text-slate-400" />
-      <div>
+      <div className="flex-1">
         <p className="text-sm font-medium text-navy-800">{search.query}</p>
-        <p className="text-xs text-slate-400">{new Date(search.searchedAt).toLocaleString()}</p>
+        <div className="flex items-center gap-2 mt-0.5">
+          {search.city && (
+            <span className="text-xs text-slate-400 flex items-center gap-1">
+              <MapPin size={10} /> {search.city}
+            </span>
+          )}
+          {search.category && (
+            <span className="text-xs text-slate-400 flex items-center gap-1">
+              <Bookmark size={10} /> {search.category}
+            </span>
+          )}
+          <span className="text-xs text-slate-400">{new Date(search.searchedAt).toLocaleString()}</span>
+        </div>
       </div>
     </div>
-    <button onClick={() => onClear(search.id)} className="text-slate-400 hover:text-red-500">
-      <Trash2 size={14} />
-    </button>
+    <div className="flex gap-2">
+      <button 
+        onClick={() => onRerun(search)}
+        className="text-xs text-gold-600 hover:text-gold-700 px-2 py-1 rounded hover:bg-gold-50"
+      >
+        Search Again
+      </button>
+      <button 
+        onClick={() => onClear(search.id)} 
+        className="text-slate-400 hover:text-red-500 p-1"
+      >
+        <Trash2 size={14} />
+      </button>
+    </div>
+  </div>
+);
+
+const NotificationCard = ({ notification, onMarkRead }) => (
+  <div className={`p-3 rounded-lg border ${notification.isRead ? 'bg-white border-slate-100' : 'bg-gold-50 border-gold-200'}`}>
+    <div className="flex items-start justify-between">
+      <div className="flex-1">
+        <p className="text-sm font-medium text-navy-900">{notification.title}</p>
+        <p className="text-xs text-slate-500 mt-0.5">{notification.message}</p>
+        <p className="text-[10px] text-slate-400 mt-1">{new Date(notification.createdAt).toLocaleString()}</p>
+      </div>
+      {!notification.isRead && (
+        <button 
+          onClick={() => onMarkRead(notification.id)}
+          className="text-xs text-gold-600 hover:text-gold-700"
+        >
+          Mark read
+        </button>
+      )}
+    </div>
   </div>
 );
 
 export default function ProfilePage() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const queryParams = new URLSearchParams(location.search);
+  const tabParam = queryParams.get('tab');
+  
   const [activeTab, setActiveTab] = useState('favorites');
   const [favorites, setFavorites] = useState([]);
   const [enquiries, setEnquiries] = useState([]);
   const [searchHistory, setSearchHistory] = useState([]);
+  const [notifications, setNotifications] = useState([]);
   const [notificationSettings, setNotificationSettings] = useState({
     emailEnquiries: true,
     emailReviews: true,
@@ -127,59 +176,43 @@ export default function ProfilePage() {
     pushEnquiries: true,
     pushReviews: true
   });
-  const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
-    fetchUserData();
-    fetchFavorites();
-    fetchEnquiries();
-    fetchSearchHistory();
-    fetchNotificationSettings();
+    // Set active tab from URL param
+    if (tabParam && ['favorites', 'enquiries', 'search', 'notifications', 'settings'].includes(tabParam)) {
+      setActiveTab(tabParam);
+    }
+  }, [tabParam]);
+
+  useEffect(() => {
+    fetchAllData();
   }, []);
 
-  const fetchUserData = async () => {
+  const fetchAllData = async () => {
+    setLoading(true);
     try {
-      const res = await api.get('/auth/me');
-      setUser(res.data);
-    } catch (err) {
-      console.error('Error fetching user:', err);
-    }
-  };
+      const [userRes, favRes, enquiriesRes, searchRes, notifRes, settingsRes] = await Promise.all([
+        api.get('/auth/me').catch(() => ({ data: null })),
+        api.get('/user/favorites').catch(() => ({ data: [] })),
+        api.get('/user/enquiries').catch(() => ({ data: [] })),
+        api.get('/user/search-history').catch(() => ({ data: [] })),
+        api.get('/user/notifications').catch(() => ({ data: [] })),
+        api.get('/user/notification-settings').catch(() => ({ data: {} }))
+      ]);
 
-  const fetchFavorites = async () => {
-    try {
-      const res = await api.get('/user/favorites');
-      setFavorites(res.data);
+      setUser(userRes.data);
+      setFavorites(favRes.data || []);
+      setEnquiries(enquiriesRes.data || []);
+      setSearchHistory(searchRes.data || []);
+      setNotifications(notifRes.data || []);
+      setUnreadCount((notifRes.data || []).filter(n => !n.isRead).length);
+      setNotificationSettings(settingsRes.data || notificationSettings);
     } catch (err) {
-      console.error('Error fetching favorites:', err);
-    }
-  };
-
-  const fetchEnquiries = async () => {
-    try {
-      const res = await api.get('/user/enquiries');
-      setEnquiries(res.data);
-    } catch (err) {
-      console.error('Error fetching enquiries:', err);
-    }
-  };
-
-  const fetchSearchHistory = async () => {
-    try {
-      const res = await api.get('/user/search-history');
-      setSearchHistory(res.data);
-    } catch (err) {
-      console.error('Error fetching search history:', err);
-    }
-  };
-
-  const fetchNotificationSettings = async () => {
-    try {
-      const res = await api.get('/user/notification-settings');
-      setNotificationSettings(res.data);
-    } catch (err) {
-      console.error('Error fetching notification settings:', err);
+      console.error('Error fetching profile data:', err);
+      toast.error('Failed to load profile data');
     } finally {
       setLoading(false);
     }
@@ -198,8 +231,10 @@ export default function ProfilePage() {
   const handleClearSearchHistory = async (searchId = null) => {
     try {
       if (searchId) {
-        // Delete single item - need endpoint
+        // Delete single item
+        await api.delete(`/user/search-history/${searchId}`);
         setSearchHistory(searchHistory.filter(s => s.id !== searchId));
+        toast.success('Search removed');
       } else {
         await api.delete('/user/search-history');
         setSearchHistory([]);
@@ -207,6 +242,37 @@ export default function ProfilePage() {
       }
     } catch (err) {
       toast.error('Failed to clear history');
+    }
+  };
+
+  const handleRerunSearch = (search) => {
+    const params = new URLSearchParams();
+    if (search.query) params.set('search', search.query);
+    if (search.city) params.set('city', search.city);
+    if (search.category) params.set('category', search.category);
+    navigate(`/listings?${params.toString()}`);
+  };
+
+  const handleMarkNotificationRead = async (notificationId) => {
+    try {
+      await api.patch(`/user/notifications/${notificationId}/read`);
+      setNotifications(notifications.map(n => 
+        n.id === notificationId ? { ...n, isRead: true } : n
+      ));
+      setUnreadCount(prev => Math.max(0, prev - 1));
+    } catch (err) {
+      toast.error('Failed to mark as read');
+    }
+  };
+
+  const handleMarkAllRead = async () => {
+    try {
+      await api.post('/user/notifications/mark-all-read');
+      setNotifications(notifications.map(n => ({ ...n, isRead: true })));
+      setUnreadCount(0);
+      toast.success('All notifications marked as read');
+    } catch (err) {
+      toast.error('Failed to mark all as read');
     }
   };
 
@@ -225,8 +291,8 @@ export default function ProfilePage() {
     { id: 'favorites', label: 'Favorites', icon: Heart, count: favorites.length },
     { id: 'enquiries', label: 'Enquiries', icon: MessageCircle, count: enquiries.filter(e => e.status === 'new').length },
     { id: 'search', label: 'Search History', icon: History, count: searchHistory.length },
-    { id: 'notifications', label: 'Notifications', icon: Bell },
-    { id: 'profile', label: 'Profile', icon: User },
+    { id: 'notifications', label: 'Notifications', icon: Bell, count: unreadCount },
+    { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
   if (loading) {
@@ -264,6 +330,11 @@ export default function ProfilePage() {
                 <div>
                   <p className="font-semibold text-navy-900">{user?.name || 'User'}</p>
                   <p className="text-xs text-slate-500">{user?.email}</p>
+                  {user?.emailVerified && (
+                    <span className="text-[10px] text-green-600 flex items-center gap-0.5">
+                      <CheckCircle size={8} /> Verified
+                    </span>
+                  )}
                 </div>
               </div>
               <div className="space-y-1">
@@ -271,7 +342,10 @@ export default function ProfilePage() {
                   <TabButton
                     key={tab.id}
                     active={activeTab === tab.id}
-                    onClick={() => setActiveTab(tab.id)}
+                    onClick={() => {
+                      setActiveTab(tab.id);
+                      navigate(`/profile?tab=${tab.id}`, { replace: true });
+                    }}
                     icon={tab.icon}
                     label={tab.label}
                     count={tab.count}
@@ -354,7 +428,8 @@ export default function ProfilePage() {
                       <SearchHistoryItem 
                         key={search.id} 
                         search={search} 
-                        onClear={handleClearSearchHistory} 
+                        onClear={handleClearSearchHistory}
+                        onRerun={handleRerunSearch}
                       />
                     ))}
                   </div>
@@ -362,23 +437,72 @@ export default function ProfilePage() {
                   <div className="text-center py-12">
                     <History size={48} className="mx-auto text-slate-300 mb-3" />
                     <p className="text-slate-500">No search history yet</p>
+                    <div className="mt-2 text-xs text-slate-400">
+                      Try searching for restaurants, migration agents, or accountants
+                    </div>
                   </div>
                 )}
               </div>
             )}
 
-            {/* Notification Settings Tab */}
+            {/* Notifications Tab */}
             {activeTab === 'notifications' && (
               <div className="bg-white rounded-xl border border-slate-100 p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="font-display text-xl font-semibold text-navy-900 flex items-center gap-2">
+                    <Bell size={20} /> Notifications
+                    {unreadCount > 0 && (
+                      <span className="text-xs bg-gold-100 text-gold-700 px-2 py-0.5 rounded-full">
+                        {unreadCount} unread
+                      </span>
+                    )}
+                  </h2>
+                  {unreadCount > 0 && (
+                    <button 
+                      onClick={handleMarkAllRead}
+                      className="text-xs text-gold-600 hover:text-gold-700"
+                    >
+                      Mark all as read
+                    </button>
+                  )}
+                </div>
+                {notifications.length > 0 ? (
+                  <div className="space-y-2">
+                    {notifications.map(notification => (
+                      <NotificationCard 
+                        key={notification.id} 
+                        notification={notification}
+                        onMarkRead={handleMarkNotificationRead}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <Bell size={48} className="mx-auto text-slate-300 mb-3" />
+                    <p className="text-slate-500">No notifications yet</p>
+                    <p className="text-xs text-slate-400 mt-1">
+                      You'll receive notifications for enquiry replies and review responses
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Settings Tab */}
+            {activeTab === 'settings' && (
+              <div className="bg-white rounded-xl border border-slate-100 p-6">
                 <h2 className="font-display text-xl font-semibold text-navy-900 mb-4 flex items-center gap-2">
-                  <Bell size={20} /> Notification Preferences
+                  <Settings size={20} /> Notification Preferences
                 </h2>
-                <div className="space-y-4">
-                  <div className="border-b border-slate-100 pb-4">
+                <div className="space-y-6">
+                  <div>
                     <h3 className="font-semibold text-navy-800 mb-3">Email Notifications</h3>
-                    <div className="space-y-2">
-                      <label className="flex items-center justify-between cursor-pointer">
-                        <span className="text-sm text-slate-600">Enquiry replies</span>
+                    <div className="space-y-3">
+                      <label className="flex items-center justify-between cursor-pointer p-2 hover:bg-slate-50 rounded-lg">
+                        <div>
+                          <span className="text-sm font-medium text-slate-700">Enquiry replies</span>
+                          <p className="text-xs text-slate-400">Get email when a business replies to your enquiry</p>
+                        </div>
                         <input 
                           type="checkbox" 
                           checked={notificationSettings.emailEnquiries}
@@ -386,8 +510,11 @@ export default function ProfilePage() {
                           className="toggle-checkbox"
                         />
                       </label>
-                      <label className="flex items-center justify-between cursor-pointer">
-                        <span className="text-sm text-slate-600">Review responses</span>
+                      <label className="flex items-center justify-between cursor-pointer p-2 hover:bg-slate-50 rounded-lg">
+                        <div>
+                          <span className="text-sm font-medium text-slate-700">Review responses</span>
+                          <p className="text-xs text-slate-400">Get email when a business responds to your review</p>
+                        </div>
                         <input 
                           type="checkbox" 
                           checked={notificationSettings.emailReviews}
@@ -395,8 +522,11 @@ export default function ProfilePage() {
                           className="toggle-checkbox"
                         />
                       </label>
-                      <label className="flex items-center justify-between cursor-pointer">
-                        <span className="text-sm text-slate-600">Newsletter</span>
+                      <label className="flex items-center justify-between cursor-pointer p-2 hover:bg-slate-50 rounded-lg">
+                        <div>
+                          <span className="text-sm font-medium text-slate-700">Newsletter</span>
+                          <p className="text-xs text-slate-400">Weekly updates on new businesses and offers</p>
+                        </div>
                         <input 
                           type="checkbox" 
                           checked={notificationSettings.emailNewsletter}
@@ -406,11 +536,14 @@ export default function ProfilePage() {
                       </label>
                     </div>
                   </div>
-                  <div>
+                  <div className="border-t border-slate-100 pt-4">
                     <h3 className="font-semibold text-navy-800 mb-3">Push Notifications</h3>
-                    <div className="space-y-2">
-                      <label className="flex items-center justify-between cursor-pointer">
-                        <span className="text-sm text-slate-600">New enquiry responses</span>
+                    <div className="space-y-3">
+                      <label className="flex items-center justify-between cursor-pointer p-2 hover:bg-slate-50 rounded-lg">
+                        <div>
+                          <span className="text-sm font-medium text-slate-700">New enquiry replies</span>
+                          <p className="text-xs text-slate-400">Get browser notifications for replies</p>
+                        </div>
                         <input 
                           type="checkbox" 
                           checked={notificationSettings.pushEnquiries}
@@ -418,8 +551,11 @@ export default function ProfilePage() {
                           className="toggle-checkbox"
                         />
                       </label>
-                      <label className="flex items-center justify-between cursor-pointer">
-                        <span className="text-sm text-slate-600">Review updates</span>
+                      <label className="flex items-center justify-between cursor-pointer p-2 hover:bg-slate-50 rounded-lg">
+                        <div>
+                          <span className="text-sm font-medium text-slate-700">Review updates</span>
+                          <p className="text-xs text-slate-400">Get browser notifications for review responses</p>
+                        </div>
                         <input 
                           type="checkbox" 
                           checked={notificationSettings.pushReviews}
@@ -429,41 +565,6 @@ export default function ProfilePage() {
                       </label>
                     </div>
                   </div>
-                </div>
-              </div>
-            )}
-
-            {/* Profile Tab */}
-            {activeTab === 'profile' && user && (
-              <div className="bg-white rounded-xl border border-slate-100 p-6">
-                <h2 className="font-display text-xl font-semibold text-navy-900 mb-4 flex items-center gap-2">
-                  <User size={20} /> Profile Information
-                </h2>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-600 mb-1">Full Name</label>
-                    <p className="text-navy-900">{user.name}</p>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-600 mb-1">Email Address</label>
-                    <p className="text-navy-900">{user.email}</p>
-                    {user.emailVerified ? (
-                      <span className="text-xs text-green-600">✓ Verified</span>
-                    ) : (
-                      <span className="text-xs text-amber-600">Not verified</span>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-600 mb-1">Phone</label>
-                    <p className="text-navy-900">{user.phone || 'Not provided'}</p>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-600 mb-1">Member Since</label>
-                    <p className="text-navy-900">{new Date(user.createdAt).toLocaleDateString('en-AU')}</p>
-                  </div>
-                  <Link to="/settings" className="btn-outline text-sm inline-block">
-                    Edit Profile
-                  </Link>
                 </div>
               </div>
             )}

@@ -4,7 +4,7 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { 
   Search, MapPin, SlidersHorizontal, X, Star, Clock, 
   ChevronLeft, ChevronRight, Filter, Briefcase, Award,
-  TrendingUp, ThumbsUp, Zap
+  TrendingUp, ThumbsUp, Zap, DollarSign, Shield, Sun
 } from 'lucide-react';
 import Navbar from '../../components/common/Navbar';
 import Footer from '../../components/common/Footer';
@@ -49,6 +49,9 @@ export default function ListingsPage() {
   const [city, setCity] = useState(queryParams.get('city') || '');
   const [category, setCategory] = useState(queryParams.get('category') || '');
   const [minRating, setMinRating] = useState(queryParams.get('rating') || '');
+  const [priceRange, setPriceRange] = useState(queryParams.get('price') || '');
+  const [verifiedOnly, setVerifiedOnly] = useState(queryParams.get('verified') === 'true');
+  const [openNow, setOpenNow] = useState(queryParams.get('open') === 'true');
   const [sortBy, setSortBy] = useState(queryParams.get('sort') || 'relevance');
   const [showFilters, setShowFilters] = useState(false);
   
@@ -77,6 +80,9 @@ export default function ListingsPage() {
       if (city) params.append('city', city);
       if (category) params.append('category', category);
       if (minRating) params.append('minRating', minRating);
+      if (priceRange) params.append('priceRange', priceRange);
+      if (verifiedOnly) params.append('verifiedOnly', 'true');
+      if (openNow) params.append('openNow', 'true');
       if (sortBy) params.append('sort', sortBy);
       params.append('page', pagination.page);
       params.append('limit', 12);
@@ -111,6 +117,9 @@ export default function ListingsPage() {
     if (city) params.set('city', city);
     if (category) params.set('category', category);
     if (minRating) params.set('rating', minRating);
+    if (priceRange) params.set('price', priceRange);
+    if (verifiedOnly) params.set('verified', 'true');
+    if (openNow) params.set('open', 'true');
     if (sortBy && sortBy !== 'relevance') params.set('sort', sortBy);
     navigate(`/listings?${params.toString()}`);
   };
@@ -120,6 +129,9 @@ export default function ListingsPage() {
     setCity('');
     setCategory('');
     setMinRating('');
+    setPriceRange('');
+    setVerifiedOnly(false);
+    setOpenNow(false);
     setSortBy('relevance');
     navigate('/listings');
   };
@@ -130,6 +142,8 @@ export default function ListingsPage() {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
+
+  const hasActiveFilters = search || city || category || minRating || priceRange || verifiedOnly || openNow;
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
@@ -181,10 +195,13 @@ export default function ListingsPage() {
             <button
               type="button"
               onClick={() => setShowFilters(!showFilters)}
-              className="btn-outline px-4 py-2 flex items-center gap-2"
+              className={`btn-outline px-4 py-2 flex items-center gap-2 ${hasActiveFilters ? 'border-gold-400 text-gold-600' : ''}`}
             >
               <Filter size={16} />
               Filters
+              {hasActiveFilters && (
+                <span className="w-2 h-2 bg-gold-500 rounded-full"></span>
+              )}
             </button>
           </form>
         </div>
@@ -197,7 +214,7 @@ export default function ListingsPage() {
             <div className="bg-white rounded-xl border border-slate-100 p-5 shadow-sm">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-semibold text-navy-900">Filters</h3>
-                {(search || city || category || minRating) && (
+                {hasActiveFilters && (
                   <button onClick={clearFilters} className="text-xs text-gold-600 hover:text-gold-700">
                     Clear all
                   </button>
@@ -237,6 +254,54 @@ export default function ListingsPage() {
                     </button>
                   ))}
                 </div>
+              </div>
+              
+              {/* Price Range Filter */}
+              <div className="mb-5">
+                <label className="block text-xs font-semibold text-slate-600 mb-2 flex items-center gap-1">
+                  <DollarSign size={12} /> Price Range
+                </label>
+                <select
+                  value={priceRange}
+                  onChange={(e) => setPriceRange(e.target.value)}
+                  className="w-full input text-sm"
+                >
+                  <option value="">Any Price</option>
+                  <option value="$">$ (Budget)</option>
+                  <option value="$$">$$ (Moderate)</option>
+                  <option value="$$$">$$$ (Premium)</option>
+                  <option value="$$$$">$$$$ (Luxury)</option>
+                </select>
+              </div>
+              
+              {/* Verified Only Filter */}
+              <div className="mb-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={verifiedOnly}
+                    onChange={(e) => setVerifiedOnly(e.target.checked)}
+                    className="w-4 h-4 rounded border-slate-300 text-gold-500 focus:ring-gold-500"
+                  />
+                  <span className="text-sm text-slate-600 flex items-center gap-1">
+                    <Shield size={14} /> Verified businesses only
+                  </span>
+                </label>
+              </div>
+              
+              {/* Open Now Filter */}
+              <div className="mb-5">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={openNow}
+                    onChange={(e) => setOpenNow(e.target.checked)}
+                    className="w-4 h-4 rounded border-slate-300 text-gold-500 focus:ring-gold-500"
+                  />
+                  <span className="text-sm text-slate-600 flex items-center gap-1">
+                    <Sun size={14} /> Open now
+                  </span>
+                </label>
               </div>
               
               <button

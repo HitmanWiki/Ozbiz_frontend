@@ -203,3 +203,34 @@ img.loaded { opacity: 1; }
   animation: bounce 1s infinite;
 }
 }
+/* Toggle switch for notification settings */
+.toggle-checkbox {
+  appearance: none;
+  width: 44px;
+  height: 24px;
+  background-color: #cbd5e1;
+  border-radius: 9999px;
+  position: relative;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.toggle-checkbox:checked {
+  background-color: #f59e0b;
+}
+
+.toggle-checkbox::before {
+  content: '';
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  background-color: white;
+  border-radius: 50%;
+  top: 2px;
+  left: 2px;
+  transition: transform 0.2s ease;
+}
+
+.toggle-checkbox:checked::before {
+  transform: translateX(20px);
+}

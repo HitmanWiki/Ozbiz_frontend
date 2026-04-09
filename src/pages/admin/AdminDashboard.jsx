@@ -22,25 +22,56 @@ const StatCard = ({ label, value, sub, icon: Icon, color, to }) => (
 export default function AdminDashboard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    api.get('/admin/stats')
-      .then(res => { setData(res.data); setLoading(false); })
-      .catch(err => { console.error('Error fetching stats:', err); setLoading(false); });
+    fetchStats();
   }, []);
 
-  if (loading) return (
-    <div className="space-y-6 max-w-7xl">
-      <div><div className="h-7 bg-slate-200 rounded w-40 animate-pulse mb-1" /><div className="h-4 bg-slate-200 rounded w-56 animate-pulse" /></div>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[...Array(4)].map((_, i) => <div key={i} className="card p-5 animate-pulse h-28"><div className="w-11 h-11 bg-slate-200 rounded-xl mb-3" /><div className="h-6 bg-slate-200 rounded w-16" /></div>)}
+  const fetchStats = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await api.get('/admin/stats', { timeout: 30000 });
+      setData(res.data);
+    } catch (err) {
+      console.error('Error fetching stats:', err);
+      setError(err.message || 'Failed to load dashboard data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="space-y-6 max-w-7xl">
+        <div><div className="h-7 bg-slate-200 rounded w-40 animate-pulse mb-1" /><div className="h-4 bg-slate-200 rounded w-56 animate-pulse" /></div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => <div key={i} className="card p-5 animate-pulse h-28"><div className="w-11 h-11 bg-slate-200 rounded-xl mb-3" /><div className="h-6 bg-slate-200 rounded w-16" /></div>)}
+        </div>
       </div>
-    </div>
-  );
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-96">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <span className="text-2xl">⚠️</span>
+          </div>
+          <h2 className="text-xl font-semibold text-navy-900 mb-2">Unable to Load Dashboard</h2>
+          <p className="text-slate-500 mb-4">{error}</p>
+          <button onClick={fetchStats} className="btn-primary">
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const { stats, recentListings, topCategories, recentEnquiries } = data || {};
 
-  // Extract values safely - FIXED: stats.users is an object, not a number
   const totalListings = stats?.listings?.total || 0;
   const pendingListings = stats?.listings?.pending || 0;
   const activeListings = stats?.listings?.active || 0;
